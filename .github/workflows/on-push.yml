@@ -1,0 +1,22 @@
+name: On Push
+on: [push]
+jobs:
+  build:
+    name: Build & Test
+    runs-on: Linux
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v4
+      - name: "Setup Node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Installing 
+        run: npm install
+      - name: Building
+        run: npm run build
+      - name: Linting
+        run: npm run lint
+      - name: Testing
+        run: npm run test

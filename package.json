@@ -1,0 +1,57 @@
+{
+  "name": "lup-docker",
+  "version": "1.0.0",
+  "description": "NodeJS library to interact with the Docker engine.",
+  "main": "./lib/index",
+  "types": "./lib/index.d.ts",
+  "files": [
+    "lib/**/*"
+  ],
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./types": "./lib/types.js"
+  },
+  "scripts": {
+    "test": "jest --config jestconfig.json",
+    "build": "tsc",
+    "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",
+    "lint": "tslint -p tsconfig.json",
+    "prepublishOnly": "npm test && npm run lint && npm run build",
+    "preversion": "npm run lint",
+    "version": "npm run format && git add -A src",
+    "postversion": "git push && git push --tags"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LupCode/node-lup-docker.git"
+  },
+  "keywords": [
+    "node",
+    "module",
+    "docker",
+    "engine",
+    "compose",
+    "container",
+    "api"
+  ],
+  "author": "LupCode.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LupCode/node-lup-docker/issues"
+  },
+  "homepage": "https://github.com/LupCode/node-lup-docker#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.2.1",
+    "jest": "^30.0.5",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.1",
+    "tslint": "^6.1.3",
+    "tslint-config-prettier": "^1.18.0",
+    "typescript": "^5.9.2"
+  }
+}
