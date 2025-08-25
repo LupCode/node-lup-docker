@@ -3,13 +3,13 @@ import { DockerLogStream, DockerLogStreamCallback, DockerStatsStream } from "./s
 export type DockerSuccess<T> = { 
 
     /** Object containing the successful response data. */
-    success: T;
+    success?: T;
 };
 
 export type DockerError<T extends object = {}> = {
 
     /** Object containing the error response data. */
-    error: { 
+    error?: { 
 
         /** DockerError message (always present in case of an error). */
         message: string;
@@ -26,7 +26,7 @@ export type DockerError<T extends object = {}> = {
      } & T;
 };
 
-export type DockerResult<S, E extends object = {}> = DockerSuccess<S> | DockerError<E>;
+export type DockerResult<S, E extends object = {}> = DockerSuccess<S> & DockerError<E>;
 
 
 

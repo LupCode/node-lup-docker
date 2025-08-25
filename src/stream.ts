@@ -4,31 +4,39 @@ import { DockerContainerStats } from "./types";
 
 export class DockerStatsStream extends ReadableStream<DockerContainerStats> {
     constructor(source: ReadableStream<Uint8Array>) {
-        super({
-            async start(controller){
-                let readerDone = false;
-                const reader = source.getReader();
-                const decoder = new TextDecoder('utf-8');
-                let curr = '';
-                while(!reader.closed && !readerDone){
-                    const { done, value } = await reader.read();
-                    readerDone = readerDone || done;
-                    if(!value) continue;
+        let reader: ReadableStreamDefaultReader<Uint8Array<ArrayBufferLike>>;
 
-                    curr += decoder.decode(value, { stream: true });
-                    let idx: number;
-                    while((idx = curr.indexOf('\n')) >= 0){
-                        const line = curr.slice(0, idx);
-                        curr = curr.slice(idx + 1);
-                        const statsJson = JSON.parse(line);
-                        controller.enqueue(decodeDockerContainerStats(statsJson));
+        super({
+
+            async start(controller){
+                try {
+                    let readerDone = false;
+                    reader = source.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let curr = '';
+                    while(!readerDone){
+                        const { done, value } = await reader.read();
+                        readerDone = readerDone || done;
+                        if(!value) continue;
+
+                        curr += decoder.decode(value, { stream: true });
+                        let idx: number;
+                        while((idx = curr.indexOf('\n')) >= 0){
+                            const line = curr.slice(0, idx);
+                            curr = curr.slice(idx + 1);
+                            const statsJson = JSON.parse(line);
+                            controller.enqueue(decodeDockerContainerStats(statsJson));
+                        }
                     }
+                } finally {
+                    controller.close();
                 }
-                controller.close();
             },
-            cancel(){
-                source.cancel();
-            }
+
+            async cancel(reason){
+                if(reader) await reader.cancel(reason);
+            },
+
         });
     }
 }
@@ -136,81 +144,87 @@ export type DockerLogStreamChunk = {
 export class DockerLogStream extends ReadableStream<DockerLogStreamChunk> {
 
     constructor(contentType: string, source: ReadableStream<Uint8Array>) {
+        let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
         super({
+
             async start(controller) {
-                // Initialize the stream
-                let readerDone = false;
-                const reader = source.getReader();
-                const decoder = new TextDecoder('utf-8');
+                try {
+                    let readerDone = false;
+                    reader = source.getReader();
+                    const decoder = new TextDecoder('utf-8');
 
-                // any other type of stream
-                if(contentType !== 'application/vnd.docker.multiplexed-stream'){
-                    while(!reader.closed && !readerDone){
-                        const { done, value } = await reader.read();
+                    // any other type of stream
+                    if(contentType !== 'application/vnd.docker.multiplexed-stream'){
+                        while(!readerDone){
+                            const { done, value } = await reader.read();
+                            readerDone = readerDone || done;
+                            if(!value) continue;
+
+                            controller.enqueue({ type: 'stdout', data: decoder.decode(value, { stream: true }) });
+                        }
+                        controller.close();
+                        return;
+                    }
+
+
+                    // Docker Multi-Stream
+                    let currType: DockerLogStreamType | null = null; // if null read header
+                    let currBuf: Buffer = Buffer.alloc(0);
+                    let currOffset = 0;
+                    let currPayloadSize: number = 0;
+
+                    while(!readerDone){
+                        const { done, value: chunk } = await reader.read();
                         readerDone = readerDone || done;
-                        if(!value) continue;
+                        if(!chunk) continue;
+                        
+                        if(currOffset < currBuf.length){
+                            currBuf = Buffer.concat([currBuf, chunk]);
+                        } else {
+                            currBuf = Buffer.from(chunk);
+                            currOffset = 0;
+                        }
 
-                        controller.enqueue({ type: 'stdout', data: decoder.decode(value, { stream: true }) });
-                    }
-                    controller.close();
-                    return;
-                }
-
-
-                // Docker Multi-Stream
-                let currType: DockerLogStreamType | null = null; // if null read header
-                let currBuf: Buffer = Buffer.alloc(0);
-                let currOffset = 0;
-                let currPayloadSize: number = 0;
-
-                while(!reader.closed && !readerDone){
-                    const { done, value: chunk } = await reader.read();
-                    readerDone = readerDone || done;
-                    if(!chunk) continue;
-                    
-                    if(currOffset < currBuf.length){
-                        currBuf = Buffer.concat([currBuf, chunk]);
-                    } else {
-                        currBuf = Buffer.from(chunk);
-                        currOffset = 0;
-                    }
-
-                    while(true){
-                        if(!currType){
-                            // read header
-                            if(currBuf.length - currOffset >= 8){ // header has 8 bytes
-                                switch(currBuf[currOffset]){
-                                    case 0: currType = 'stdin'; break;
-                                    case 1: currType = 'stdout'; break;
-                                    case 2: currType = 'stderr'; break;
-                                    default: currType = 'stdout'; break;
+                        while(true){
+                            if(!currType){
+                                // read header
+                                if(currBuf.length - currOffset >= 8){ // header has 8 bytes
+                                    switch(currBuf[currOffset]){
+                                        case 0: currType = 'stdin'; break;
+                                        case 1: currType = 'stdout'; break;
+                                        case 2: currType = 'stderr'; break;
+                                        default: currType = 'stdout'; break;
+                                    }
+                                    currPayloadSize = currBuf.readUInt32BE(currOffset + 4); // read length of payload
+                                    currOffset += 8; // move past header
+                                } else {
+                                    break;
                                 }
-                                currPayloadSize = currBuf.readUInt32BE(currOffset + 4); // read length of payload
-                                currOffset += 8; // move past header
+                            }
+
+                            if(currBuf.length - currOffset >= currPayloadSize){
+                                const end = currOffset + currPayloadSize;
+                                const payload = currBuf.toString('utf8', currOffset, end);
+                                controller.enqueue({ type: currType, data: payload });
+                                currBuf = (currBuf.length > end) ? currBuf.subarray(end) : Buffer.alloc(0);
+                                currType = null;
+                                currPayloadSize = 0;
+                                currOffset = 0;
                             } else {
                                 break;
                             }
                         }
-
-                        if(currBuf.length - currOffset >= currPayloadSize){
-                            const end = currOffset + currPayloadSize;
-                            const payload = currBuf.toString('utf8', currOffset, end);
-                            controller.enqueue({ type: currType, data: payload });
-                            currBuf = (currBuf.length > end) ? currBuf.subarray(end) : Buffer.alloc(0);
-                            currType = null;
-                            currPayloadSize = 0;
-                            currOffset = 0;
-                        } else {
-                            break;
-                        }
                     }
+                } finally {
+                    controller.close();
                 }
-                controller.close();
             },
-            cancel() {
-                // Clean up the stream
-                return source.cancel();
+
+            async cancel(reason) {
+                if(reader) await reader.cancel(reason);
             },
+
         });
     }
 }
