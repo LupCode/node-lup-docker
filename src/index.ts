@@ -1,5 +1,5 @@
 import DockerClient from './client';
-import { DockerContainer, DockerCreateContainerOptions, DockerCreateContainerResponse, DockerCreateContainerResponseDockerError, DockerGetContainersOptions, DockerResult } from './types';
+import { DockerContainer, DockerCreateContainerOptions, DockerCreateContainerResponse, DockerCreateContainerResponseDockerError, DockerGetContainerLogsOptions, DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError, DockerGetContainersOptions, DockerGetContainerStatsOptions, DockerGetContainerStatsResponseError, DockerGetContainerStatsResult, DockerResult } from './types';
 
 const DOCKER = new DockerClient();
 
@@ -17,15 +17,38 @@ export async function createContainer(image: string, options?: DockerCreateConta
 
 
 /**
+ * Returns the logs of a container either as string or as stream.
+ * 
+ * @param containerIdOrName ID or name of the container to return the logs from.
+ * @param options Optional options for querying logs.
+ * @returns Logs of the container or an error.
+ */
+export async function getContainerLogs(containerIdOrName: string, options?: DockerGetContainerLogsOptions): Promise<DockerResult<DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError>> {
+  return DOCKER.getContainerLogs(containerIdOrName, options);
+}
+
+
+/**
  * Returns a list of containers.
  * 
  * @param options Optional options for querying containers.
  * @returns List of containers or an error.
  */
 export async function getContainers(options?: DockerGetContainersOptions): Promise<DockerResult<DockerContainer[]>> {
-    return DOCKER.getContainers(options);
+  return DOCKER.getContainers(options);
 }
 
+
+/**
+ * Returns the utilization stats for a container as single value or as continuous stream.
+ *
+ * @param containerIdOrName ID or name of the container.
+ * @param options Options for fetching the stats.
+ * @returns Single stats object, stream of stat objects, or an error.
+ */
+export async function getContainerStats(containerIdOrName: string, options?: DockerGetContainerStatsOptions): Promise<DockerResult<DockerGetContainerStatsResult, DockerGetContainerStatsResponseError>> {
+  return DOCKER.getContainerStats(containerIdOrName, options);
+}
 
 
 
