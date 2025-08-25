@@ -776,6 +776,29 @@ export type DockerCreateContainerResponseDockerError = {
 };
 
 
+export type DockerDeleteContainerOptions = {
+
+    /** Kill the container in case it is running (default false). */
+    force?: boolean;
+
+    /** Delete the link associated with the container (default false). */
+    link?: boolean;
+
+    /** Delete anonymous volumes associated with the container (default false). */
+    volumes?: boolean;
+
+};
+export type DockerDeleteContainerResponseError = {
+
+    /** If the container is still running and therefore cannot be deleted. */
+    stillRunning?: boolean;
+
+    /** If no container with the given ID or name was not found. */
+    notFound?: boolean;
+
+};
+
+
 export type DockerDevice = {
 
     /** Path in the container under which the device should be accessible. */
@@ -845,24 +868,20 @@ export type DockerGetContainerLogsOptions = {
     /** Only returns logs until the given Date or UNIX timestamp. */
     until?: Date | number;
 };
-
 export type DockerGetContainerLogsResponseStream = {
 
     /** Log as a stream (if 'stream' is true). */
     stream: DockerLogStream;
 };
-
 export type DockerGetContainerLogsResponseText = {
 
     /** Log as plain text (if 'stream' is false). */
     text: string;
 };
-
 export type DockerGetContainerLogsResponse = DockerGetContainerLogsResponseStream | DockerGetContainerLogsResponseText;
-
 export type DockerGetContainerLogsResponseError = {
 
-    /** If no container with the given ID or name was found. */
+    /** If no container with the given ID or name was not found. */
     notFound?: boolean;
 };
 
@@ -899,14 +918,11 @@ export type DockerGetContainersOptions = {
         /** Return containers with a given ID. */
         id?: string | string[];
 
-        /** Return containers with a given Windows isolation mode. */
-        windowsIsolation?: DockerWindowsIsolation | DockerWindowsIsolation[];
-
         /** Return containers that are a task or not. */
         isTask?: boolean;
 
-        /** Return containers with a given labels in the form of '<key>' or '<key>=<value>' */
-        label?: string | string[];
+        /** Return containers with a given labels. */
+        labels?: {[key: string]: string | null};
 
         /** Return containers with a given name. */
         name?: string | string[];
@@ -925,6 +941,9 @@ export type DockerGetContainersOptions = {
 
         /** Return containers with a given volume name or mount point destination. */
         volume?: string | string[];
+
+        /** Return containers with a given Windows isolation mode. */
+        windowsIsolation?: DockerWindowsIsolation | DockerWindowsIsolation[];
     };
 };
 
@@ -950,6 +969,44 @@ export type DockerGetContainerStatsResponseError = {
 
     /** If no container with the given ID or name was found. */
     notFound?: boolean;
+};
+
+
+export type DockerGetImagesOptions = {
+
+    /** If all images, even intermediate ones, should be included and not only top-level ones (default false). */
+    all?: boolean;
+
+    /** Wether to add digest information for each image by adding the additional property 'repositoryDigests' (default false). */
+    digests?: boolean;
+
+    /** Filters to select specific images. */
+    filter?: {
+
+        /** Select images created before the given image ID or name in the format <image-name>[:tag] or <image-id> or <image@digest> */
+        beforeImage?: string | string[];
+
+        /** Select only dangling images (unreferenced by any container). */
+        dangling?: boolean;
+
+        /** Select images with a given label. */
+        labels?: { [key: string]: string | null };
+
+        /** Select images with a reference to the given image in the form <image-name>[:tag] */
+        reference?: string;
+
+        /** Select images created after the given image ID or name in the format <image-name>[:tag] or <image-id> or <image@digest> */
+        sinceImage?: string | string[];
+
+        /** Select images created before the given timestamp. */
+        until?: Date;
+    };
+
+    /** Wether to add manifest information for each image by adding the additional property 'manifests' (default false). */
+    manifests?: boolean;
+
+    /** Compute and return the shared size of each image by adding the additional property 'sharedSize' (default false). */
+    sharedSize?: boolean;
 };
 
 
@@ -1260,6 +1317,19 @@ export type DockerHostConfig = DockerHostConfigNetwork & {
 };
 
 
+export type DockerImage = {
+
+    /** ID of the image. */
+    imageId: string;
+
+    /** ID of the parent image if this image is derived from another image. */
+    parentId?: string;
+
+    /** List of images tags and names associated with the image in the local image cache (can be empty in case it is 'untagged'). */
+    repositoryTags?: string[];
+};
+
+
 export type DockerImageMetadata = {
 
     /** Additional arbitrary metadata related to the target content (can be empty). */
@@ -1286,6 +1356,16 @@ export type DockerImageMetadata = {
     /** URLs from which the content MAY be downloaded (can be empty). */
     urls: string[];
     
+};
+
+
+export type DockerKillContainerResponseError = {
+
+    /** If no container with the given ID or name was not found. */
+    notFound?: boolean;
+
+    /** If the container is not running. */
+    notRunning?: boolean;
 };
 
 
@@ -1356,6 +1436,21 @@ export type DockerPortMapping = {
 export type DockerProtocol = 'sctp' | 'tcp' | 'udp';
 
 
+export type DockerRestartContainerOptions = {
+
+    /** Signal to send to the container as an inter or string (e.g. SIGINT). */
+    signal?: number | string;
+
+    /** Seconds to wait before killing the container. */
+    timeout?: number;
+};
+export type DockerRestartContainerResponseError = {
+
+    /** If no container with the given ID or name was not found. */
+    notFound?: boolean;
+};
+
+
 export type DockerRestartPolicy = {
 
     /** Name of the restart policy. */
@@ -1364,6 +1459,34 @@ export type DockerRestartPolicy = {
     /** Maximum retry count if name is 'on-failure'. */
     maximumRetryCount?: number;
 
+};
+
+
+export type DockerStartContainerResponseError = {
+
+    /** If the container was already started. */
+    alreadyStarted?: boolean;
+
+    /** If no container with the given ID or name was not found. */
+    notFound?: boolean;
+};
+
+
+export type DockerStopContainerOptions = {
+
+    /** Signal to send to the container as an inter or string (e.g. SIGINT). */
+    signal?: number | string;
+
+    /** Seconds to wait before killing the container. */
+    timeout?: number;
+};
+export type DockerStopContainerResponseError = {
+
+    /** If the container was already stopped. */
+    alreadyStopped?: boolean;
+
+    /** If no container with the given ID or name was not found. */
+    notFound?: boolean;
 };
 
 

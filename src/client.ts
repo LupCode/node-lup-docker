@@ -2,7 +2,7 @@ import fs from 'fs';
 import http from 'http';
 import net from 'net';
 import { Readable } from 'stream';
-import { DockerClientOptions, DockerContainer, DockerContainerStats, DockerCreateContainerOptions, DockerCreateContainerResponse, DockerCreateContainerResponseDockerError, DockerError, DockerGetContainerLogsOptions, DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError, DockerGetContainerLogsResponseStream, DockerGetContainersOptions, DockerGetContainerStatsOptions, DockerGetContainerStatsResponseError, DockerGetContainerStatsResult, DockerResult, DockerSuccess } from "./types";
+import { DockerClientOptions, DockerContainer, DockerContainerStats, DockerCreateContainerOptions, DockerCreateContainerResponse, DockerCreateContainerResponseDockerError, DockerDeleteContainerOptions, DockerDeleteContainerResponseError, DockerError, DockerGetContainerLogsOptions, DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError, DockerGetContainerLogsResponseStream, DockerGetContainersOptions, DockerGetContainerStatsOptions, DockerGetContainerStatsResponseError, DockerGetContainerStatsResult, DockerKillContainerResponseError, DockerRestartContainerOptions, DockerRestartContainerResponseError, DockerResult, DockerStartContainerResponseError, DockerStopContainerOptions, DockerStopContainerResponseError, DockerSuccess } from "./types";
 import { DockerStatsStream, DockerLogStream } from './stream';
 import { decodeDockerContainer, decodeDockerContainerStats, encodeCreateContainerOptions } from './convert';
 
@@ -109,7 +109,7 @@ class DockerClient {
      * @param stream Optional if the body should be interpreted as a stream.
      * @returns Response object.
      */
-    public async request(method: 'GET' | 'POST', uri: string, query?: {[key: string]: string}, body?: string, stream?: boolean): Promise<DockerRequestResult> {
+    public async request(method: 'GET' | 'POST' | 'DELETE', uri: string, query?: {[key: string]: string}, body?: string, stream?: boolean): Promise<DockerRequestResult> {
         await this.checkReady();
 
         const queryArr = Object.entries(query || {}).map<string>(entry => entry[0] + '=' + encodeURIComponent(entry[1]));
@@ -212,7 +212,7 @@ class DockerClient {
      * @returns Response object.
      * @template T Return type.
      */
-    public async requestJson<T = any>(method: 'GET' | 'POST', uri: string, query?: {[key: string]: string}, body?: string): Promise<Partial<DockerError> & { status: number, ok: boolean, body?: T }> {
+    public async requestJson<T = any>(method: 'GET' | 'POST' | 'DELETE', uri: string, query?: {[key: string]: string}, body?: string): Promise<Partial<DockerError> & { status: number, ok: boolean, body?: T }> {
         return this.request(method, uri, query, body).then(res => {
             if(!res.ok) return res as any;
             return { ...res, body: JSON.parse((res as DockerRequestResultBody).body!) };
@@ -230,7 +230,6 @@ class DockerClient {
     // -------------------------------------------------
     // --- CONTAINERS ----------------------------------
     // -------------------------------------------------
-
 
 
 
@@ -269,6 +268,35 @@ class DockerClient {
 
 
 
+    /**
+     * Deletes a container.
+     * 
+     * @param containerIdOrName ID or name of the container to delete.
+     * @param options Optional options for deleting the container.
+     * @returns Empty object on success or an error.
+     */
+    public async deleteContainer(containerIdOrName: string, options?: DockerDeleteContainerOptions): Promise<DockerResult<{}, DockerDeleteContainerResponseError>> {
+        const query: {[key: string]: string} = {};
+        if(options?.force) query.force = 'true';
+        if(options?.link) query.link = 'true';
+        if(options?.volumes) query.v = 'true';
+        return this.requestJson('DELETE', '/containers/' + containerIdOrName, query).then<DockerResult<{}, DockerDeleteContainerResponseError>>(response => {
+            if(!response.ok || response.body.message){
+                const res: DockerResult<{}, DockerDeleteContainerResponseError> = {
+                    error: response.error!
+                };
+                if(response.status === 404) res.error!.notFound = true;
+                if(response.status === 409) res.error!.stillRunning = true;
+                return res;
+            }
+
+            return {
+                success: {}
+            };
+        });
+    }
+
+
 
     /**
      * Returns the logs of a container either as string or as stream.
@@ -305,7 +333,6 @@ class DockerClient {
             }) as DockerResult<DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError>;
         });
     }
-
 
 
 
@@ -354,6 +381,7 @@ class DockerClient {
     }
 
 
+
     /**
      * Returns the utilization stats for a container as single value or as continuous stream.
      *
@@ -394,8 +422,115 @@ class DockerClient {
     }
 
 
+    /**
+     * Kills a container or sends another signal to the container.
+     * Killing a container is similar to stopping it except that it immediately terminates the container's processes.
+     *
+     * @param containerIdOrName ID or name of the container.
+     * @param signal Optional signal to send to the container.
+     * @returns Promise resolving to empty object on successful kill or an error.
+     */
+    public async killContainer(containerIdOrName: string, signal?: number | string): Promise<DockerResult<{}, DockerKillContainerResponseError>> {
+        const query: {[key: string]: string} = {};
+        if(signal) query.signal = signal.toString();
+        return this.requestJson('POST', '/containers/' + containerIdOrName + '/kill', query).then<DockerResult<{}, DockerKillContainerResponseError>>(response => {
+            if(!response.ok || response.body.message){
+                const res: DockerResult<{}, DockerKillContainerResponseError> = {
+                    error: response.error!
+                };
+                if(response.status === 404) res.error!.notFound = true;
+                if(response.status === 409) res.error!.notRunning = true;
+                return res;
+            }
+
+            return {
+                success: {}
+            };
+        });
+    }
 
 
+    /**
+     * Restarts a container.
+     *
+     * @param containerIdOrName ID or name of the container.
+     * @param options Optional parameters for restarting the container.
+     * @returns Promise resolving to empty object on successful restart or an error.
+     */
+    public async restartContainer(containerIdOrName: string, options?: DockerRestartContainerOptions): Promise<DockerResult<{}, DockerRestartContainerResponseError>> {
+        const query: {[key: string]: string} = {};
+        if(options?.signal) query.signal = options.signal.toString();
+        if(options?.timeout !== undefined) query.t = options.timeout.toString();
+        return this.requestJson('POST', '/containers/' + containerIdOrName + '/restart', query).then<DockerResult<{}, DockerRestartContainerResponseError>>(response => {
+            if(!response.ok || response.body.message){
+                const res: DockerResult<{}, DockerRestartContainerResponseError> = {
+                    error: response.error!
+                };
+                if(response.status === 404) res.error!.notFound = true;
+                return res;
+            }
+
+            return {
+                success: {}
+            };
+        });
+    }
+
+
+    /**
+     * Starts a container.
+     *
+     * @param containerIdOrName ID or name of the container.
+     * @param detachKeys Optional key sequence for detaching the container. Single character [a-Z] or ctrl-<value> with <value> being [a-z], '@', '^', ',', '[', or '_'.
+     * @returns Promise resolving to empty object on successful start or an error.
+     */
+    public async startContainer(containerIdOrName: string, detachKeys?: string): Promise<DockerResult<{}, DockerStartContainerResponseError>> {
+        const query: {[key: string]: string} = {};
+        if(detachKeys) query.detachKeys = detachKeys;
+        return this.requestJson('POST', '/containers/' + containerIdOrName + '/start', query).then<DockerResult<{}, DockerStartContainerResponseError>>(response => {
+            if(!response.ok || response.body.message){
+                const res: DockerResult<{}, DockerStartContainerResponseError> = {
+                    error: response.error!
+                };
+                if(response.status === 304) res.error!.alreadyStarted = true;
+                if(response.status === 404) res.error!.notFound = true;
+                return res;
+            }
+
+            return {
+                success: {}
+            };
+        });
+    }
+
+
+
+    /**
+     * Stops a running container.
+     * 
+     * @param containerIdOrName ID or name of the container.
+     * @param options Optional parameters for stopping the container.
+     * @returns Promise resolving to empty object on successful stop or an error.
+     */
+    public async stopContainer(containerIdOrName: string, options?: DockerStopContainerOptions): Promise<DockerResult<{}, DockerStopContainerResponseError>> {
+        const query: {[key: string]: string} = {};
+        if(options?.signal) query.signal = options.signal.toString();
+        if(options?.timeout !== undefined) query.t = options.timeout.toString();
+        return this.requestJson('POST', '/containers/' + containerIdOrName + '/stop', query).then<DockerResult<{}, DockerStopContainerResponseError>>(response => {
+            if(!response.ok || response.body.message){
+                const res: DockerResult<{}, DockerStopContainerResponseError> = {
+                    error: response.error!
+                };
+                if(response.status === 304) res.error!.alreadyStopped = true;
+                if(response.status === 404) res.error!.notFound = true;
+                return res;
+            }
+
+            return {
+                success: {}
+            };
+        });
+    }
 
 
 
