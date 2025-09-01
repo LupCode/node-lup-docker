@@ -1,12 +1,13 @@
 import DockerClient from '../client';
 
-/*
+
 test('getContainers', async () => {
   const client = new DockerClient();
   const containers = await client.getContainers();
   //console.log(JSON.stringify(containers, null, 2));
 });
 
+/*
 test('createContainer', async () => {
   const client = new DockerClient();
   const container = await client.createContainer('alpine', {
@@ -33,5 +34,13 @@ test('getContainerStats', async () => {
     }
     await reader.cancel();
   }
+});
+*/
+
+/*
+test('getImages', async () => {
+  const client = new DockerClient();
+  const images = await client.getImages();
+  console.log(JSON.stringify(images, null, 2));
 });
 */
