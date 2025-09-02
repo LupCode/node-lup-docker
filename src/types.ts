@@ -1005,11 +1005,11 @@ export type DockerHealthCheck = {
 };
 
 export type DockerHostConfigNetwork = {
-  /** Network mode to use for the container. */
-  networkMode?: DockerContainerNetworkMode;
-
   /** Additional annotations for the container. */
   annotations?: { [key: string]: string };
+
+  /** Network mode to use for the container. */
+  networkMode?: DockerContainerNetworkMode;
 };
 
 export type DockerHostConfig = DockerHostConfigNetwork & {

@@ -1,6 +1,5 @@
 import DockerClient from '../client';
 
-
 test('getContainers', async () => {
   const client = new DockerClient();
   const containers = await client.getContainers();
