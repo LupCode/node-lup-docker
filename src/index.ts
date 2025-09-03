@@ -1,5 +1,5 @@
 import DockerClient from './client';
-import { DockerLogStream, DockerStatsStream } from './stream';
+import { DockerLogStream, DockerStatsStream, DockerStatsStreamReader } from './stream';
 import {
   DockerContainer,
   DockerContainerStats,
@@ -153,6 +153,21 @@ const Docker = {
     options?: DockerGetContainerStatsOptions,
   ): Promise<DockerResult<DockerContainerStats, DockerGetContainerStatsResponseError>> {
     return CLIENT.getContainerStats(containerIdOrName, options);
+  },
+
+  /**
+   * Returns the utilization stats for a container as a continuous stream
+   * tunneled into a stream reader.
+   *
+   * @warning The stream will continuously produce stats objects which accumulate over time if not consumed!
+   *
+   * @param containerIdOrName ID or name of the container.
+   * @returns Stream of stat objects tunneled into a stream reader or an error.
+   */
+  async getContainerStatsReader(
+    containerIdOrName: string,
+  ): Promise<DockerResult<DockerStatsStreamReader, DockerGetContainerStatsResponseError>> {
+    return CLIENT.getContainerStatsReader(containerIdOrName);
   },
 
   /**

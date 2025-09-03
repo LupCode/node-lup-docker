@@ -33,7 +33,7 @@ import {
   DockerExportImagesOptions,
   DockerContainerStats,
 } from './types';
-import { DockerStatsStream, DockerLogStream } from './stream';
+import { DockerStatsStream, DockerLogStream, DockerStatsStreamReader } from './stream';
 import {
   decodeDockerContainer,
   decodeDockerContainerStats,
@@ -639,6 +639,25 @@ class DockerClient {
           success: decodeDockerContainerStats(JSON.parse((response as DockerRequestResultBody).body!))!,
         };
       },
+    );
+  }
+
+  /**
+   * Returns the utilization stats for a container as a continuous stream
+   * tunneled into a stream reader.
+   *
+   * @warning The stream will continuously produce stats objects which accumulate over time if not consumed!
+   *
+   * @param containerIdOrName ID or name of the container.
+   * @returns Stream of stat objects tunneled into a stream reader or an error.
+   */
+  public async getContainerStatsReader(
+    containerIdOrName: string,
+  ): Promise<DockerResult<DockerStatsStreamReader, DockerGetContainerStatsResponseError>> {
+    return this.getContainerStatsStream(containerIdOrName).then<
+      DockerResult<DockerStatsStreamReader, DockerGetContainerStatsResponseError>
+    >((result) =>
+      result.success ? { success: new DockerStatsStreamReader(result.success!) } : { error: result.error! },
     );
   }
 
