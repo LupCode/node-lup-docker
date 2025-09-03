@@ -826,13 +826,6 @@ export type DockerGetContainerLogsOptions = {
   /** Return logs from stdout (default false). */
   stdOut?: boolean;
 
-  /**
-   * Keep the connection open after returning logs and continue streaming new logs (default false).
-   * The logs will be provided and streamed by invoking the provided callback function on each new log line.
-   * If the container was created with tty=true, the logs will only be a stream of type stdout.
-   */
-  stream?: boolean;
-
   /** Returns the last N lines of logs (default 'all'). */
   tail?: number | 'all';
 
@@ -842,15 +835,6 @@ export type DockerGetContainerLogsOptions = {
   /** Only returns logs until the given Date or UNIX timestamp. */
   until?: Date | number;
 };
-export type DockerGetContainerLogsResponseStream = {
-  /** Log as a stream (if 'stream' is true). */
-  stream: DockerLogStream;
-};
-export type DockerGetContainerLogsResponseText = {
-  /** Log as plain text (if 'stream' is false). */
-  text: string;
-};
-export type DockerGetContainerLogsResponse = DockerGetContainerLogsResponseStream | DockerGetContainerLogsResponseText;
 export type DockerGetContainerLogsResponseError = {
   /** If no container with the given ID or name was not found. */
   notFound?: boolean;
@@ -916,18 +900,8 @@ export type DockerGetContainersOptions = {
 };
 
 export type DockerGetContainerStatsOptions = {
-  /** Only get a single stat instead of waiting for 2 cycles (ignored if 'stream' is true). */
+  /** Only get a single stat instead of waiting for 2 cycles. */
   oneShot?: boolean;
-
-  /** Whether to keep the connection open and stream stats continuously (default false). */
-  stream?: boolean;
-};
-export type DockerGetContainerStatsResult = {
-  /** Single stats result if 'stream' is false. */
-  single?: DockerContainerStats;
-
-  /** Continuous stats stream if 'stream' is true. */
-  stream?: DockerStatsStream;
 };
 export type DockerGetContainerStatsResponseError = {
   /** If no container with the given ID or name was found. */

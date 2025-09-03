@@ -1,6 +1,8 @@
 import DockerClient from './client';
+import { DockerLogStream, DockerStatsStream } from './stream';
 import {
   DockerContainer,
+  DockerContainerStats,
   DockerCreateContainerOptions,
   DockerCreateContainerResponse,
   DockerCreateContainerResponseDockerError,
@@ -11,12 +13,10 @@ import {
   DockerExportImageOptions,
   DockerExportImagesOptions,
   DockerGetContainerLogsOptions,
-  DockerGetContainerLogsResponse,
   DockerGetContainerLogsResponseError,
   DockerGetContainersOptions,
   DockerGetContainerStatsOptions,
   DockerGetContainerStatsResponseError,
-  DockerGetContainerStatsResult,
   DockerGetImagesOptions,
   DockerImage,
   DockerImportImagesOptions,
@@ -31,7 +31,7 @@ import {
   DockerStopContainerResponseError,
 } from './types';
 
-const DOCKER = new DockerClient();
+const CLIENT = new DockerClient();
 
 const Docker = {
   /**
@@ -45,7 +45,7 @@ const Docker = {
     image: string,
     options?: DockerCreateContainerOptions,
   ): Promise<DockerResult<DockerCreateContainerResponse, DockerCreateContainerResponseDockerError>> {
-    return DOCKER.createContainer(image, options);
+    return CLIENT.createContainer(image, options);
   },
 
   /**
@@ -61,7 +61,7 @@ const Docker = {
     source: string | URL | ArrayBuffer,
     options?: DockerCreateImageOptions,
   ): Promise<DockerResult<{}, DockerCreateImageResponseError>> {
-    return DOCKER.createImage(source, options);
+    return CLIENT.createImage(source, options);
   },
 
   /**
@@ -75,7 +75,7 @@ const Docker = {
     containerIdOrName: string,
     options?: DockerDeleteContainerOptions,
   ): Promise<DockerResult<{}, DockerDeleteContainerResponseError>> {
-    return DOCKER.deleteContainer(containerIdOrName, options);
+    return CLIENT.deleteContainer(containerIdOrName, options);
   },
 
   /**
@@ -89,7 +89,7 @@ const Docker = {
     imageIdOrName: string,
     options?: DockerExportImageOptions,
   ): Promise<DockerResult<ReadableStream<Uint8Array>>> {
-    return DOCKER.exportImage(imageIdOrName, options);
+    return CLIENT.exportImage(imageIdOrName, options);
   },
 
   /**
@@ -99,21 +99,36 @@ const Docker = {
    * @returns A stream of the exported images TAR archive.
    */
   async exportImages(options?: DockerExportImagesOptions): Promise<DockerResult<ReadableStream<Uint8Array>>> {
-    return DOCKER.exportImages(options);
+    return CLIENT.exportImages(options);
   },
 
   /**
-   * Returns the logs of a container either as string or as stream.
+   * Returns the logs of a container as string.
    *
    * @param containerIdOrName ID or name of the container to return the logs from.
    * @param options Optional options for querying logs.
-   * @returns Logs of the container or an error.
+   * @returns Logs of the container as a string or an error.
    */
   async getContainerLogs(
     containerIdOrName: string,
     options?: DockerGetContainerLogsOptions,
-  ): Promise<DockerResult<DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError>> {
-    return DOCKER.getContainerLogs(containerIdOrName, options);
+  ): Promise<DockerResult<string, DockerGetContainerLogsResponseError>> {
+    return CLIENT.getContainerLogs(containerIdOrName, options);
+  },
+
+  /**
+   * Returns the logs of a container as a continuous stream.
+   * If the container was created with tty=true, the logs will only be a stream of type stdout.
+   *
+   * @param containerIdOrName ID or name of the container to return the logs from.
+   * @param options Optional options for querying logs.
+   * @returns Logs of the container as stream or an error.
+   */
+  async getContainerLogsStream(
+    containerIdOrName: string,
+    options?: DockerGetContainerLogsOptions,
+  ): Promise<DockerResult<DockerLogStream, DockerGetContainerLogsResponseError>> {
+    return CLIENT.getContainerLogsStream(containerIdOrName, options);
   },
 
   /**
@@ -123,21 +138,33 @@ const Docker = {
    * @returns List of containers or an error.
    */
   async getContainers(options?: DockerGetContainersOptions): Promise<DockerResult<DockerContainer[]>> {
-    return DOCKER.getContainers(options);
+    return CLIENT.getContainers(options);
   },
 
   /**
-   * Returns the utilization stats for a container as single value or as continuous stream.
+   * Returns the utilization stats for a container as single value.
    *
    * @param containerIdOrName ID or name of the container.
    * @param options Options for fetching the stats.
-   * @returns Single stats object, stream of stat objects, or an error.
+   * @returns Stats object or an error.
    */
   async getContainerStats(
     containerIdOrName: string,
     options?: DockerGetContainerStatsOptions,
-  ): Promise<DockerResult<DockerGetContainerStatsResult, DockerGetContainerStatsResponseError>> {
-    return DOCKER.getContainerStats(containerIdOrName, options);
+  ): Promise<DockerResult<DockerContainerStats, DockerGetContainerStatsResponseError>> {
+    return CLIENT.getContainerStats(containerIdOrName, options);
+  },
+
+  /**
+   * Returns the utilization stats for a container as a continuous stream.
+   *
+   * @param containerIdOrName ID or name of the container.
+   * @returns Stream of stat objects or an error.
+   */
+  async getContainerStatsStream(
+    containerIdOrName: string,
+  ): Promise<DockerResult<DockerStatsStream, DockerGetContainerStatsResponseError>> {
+    return CLIENT.getContainerStatsStream(containerIdOrName);
   },
 
   /**
@@ -147,7 +174,7 @@ const Docker = {
    * @returns List of images or an error.
    */
   async getImages(options?: DockerGetImagesOptions): Promise<DockerResult<DockerImage[]>> {
-    return DOCKER.getImages(options);
+    return CLIENT.getImages(options);
   },
 
   /**
@@ -161,7 +188,7 @@ const Docker = {
     imagesTar: ArrayBuffer | ReadableStream,
     options?: DockerImportImagesOptions,
   ): Promise<DockerResult> {
-    return DOCKER.importImages(imagesTar, options);
+    return CLIENT.importImages(imagesTar, options);
   },
 
   /**
@@ -176,7 +203,7 @@ const Docker = {
     containerIdOrName: string,
     signal?: number | string,
   ): Promise<DockerResult<{}, DockerKillContainerResponseError>> {
-    return DOCKER.killContainer(containerIdOrName, signal);
+    return CLIENT.killContainer(containerIdOrName, signal);
   },
 
   /**
@@ -196,7 +223,7 @@ const Docker = {
     imageName: string,
     options?: DockerPullImageOptions,
   ): Promise<DockerResult<{}, DockerPullImageResponseError>> {
-    return DOCKER.pullImage(imageName, options);
+    return CLIENT.pullImage(imageName, options);
   },
 
   /**
@@ -210,7 +237,7 @@ const Docker = {
     containerIdOrName: string,
     options?: DockerRestartContainerOptions,
   ): Promise<DockerResult<{}, DockerRestartContainerResponseError>> {
-    return DOCKER.restartContainer(containerIdOrName, options);
+    return CLIENT.restartContainer(containerIdOrName, options);
   },
 
   /**
@@ -224,7 +251,7 @@ const Docker = {
     containerIdOrName: string,
     detachKeys?: string,
   ): Promise<DockerResult<{}, DockerStartContainerResponseError>> {
-    return DOCKER.startContainer(containerIdOrName, detachKeys);
+    return CLIENT.startContainer(containerIdOrName, detachKeys);
   },
 
   /**
@@ -238,7 +265,7 @@ const Docker = {
     containerIdOrName: string,
     options?: DockerStopContainerOptions,
   ): Promise<DockerResult<{}, DockerStopContainerResponseError>> {
-    return DOCKER.stopContainer(containerIdOrName, options);
+    return CLIENT.stopContainer(containerIdOrName, options);
   },
 };
 export default Docker;

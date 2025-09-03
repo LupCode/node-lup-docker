@@ -11,13 +11,10 @@ import {
   DockerDeleteContainerResponseError,
   DockerError,
   DockerGetContainerLogsOptions,
-  DockerGetContainerLogsResponse,
   DockerGetContainerLogsResponseError,
-  DockerGetContainerLogsResponseStream,
   DockerGetContainersOptions,
   DockerGetContainerStatsOptions,
   DockerGetContainerStatsResponseError,
-  DockerGetContainerStatsResult,
   DockerGetImagesOptions,
   DockerImage,
   DockerCreateImageOptions,
@@ -31,10 +28,10 @@ import {
   DockerStartContainerResponseError,
   DockerStopContainerOptions,
   DockerStopContainerResponseError,
-  DockerSuccess,
   DockerImportImagesOptions,
   DockerExportImageOptions,
   DockerExportImagesOptions,
+  DockerContainerStats,
 } from './types';
 import { DockerStatsStream, DockerLogStream } from './stream';
 import {
@@ -456,55 +453,87 @@ class DockerClient {
   }
 
   /**
-   * Returns the logs of a container either as string or as stream.
+   * Returns the logs of a container as string.
    *
    * @param containerIdOrName ID or name of the container to return the logs from.
    * @param options Optional options for querying logs.
-   * @returns Logs of the container or an error.
+   * @returns Logs of the container as a string or an error.
    */
   public async getContainerLogs(
     containerIdOrName: string,
     options?: DockerGetContainerLogsOptions,
-  ): Promise<DockerResult<DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError>> {
+  ): Promise<DockerResult<string, DockerGetContainerLogsResponseError>> {
     const query: { [key: string]: string } = {};
+    query.follow = 'false';
     if (options?.since !== undefined)
       query.since = (
         Number.isInteger(options.since) ? options.since : Math.floor((options.since as Date).getTime() / 1000)
       ).toString();
     if (options?.stdErr !== undefined) query.stderr = options.stdErr ? 'true' : 'false';
     if (options?.stdOut !== undefined) query.stdout = options.stdOut ? 'true' : 'false';
-    if (options?.stream !== undefined) query.follow = 'true';
     if (options?.tail !== undefined) query.tail = options.tail.toString();
     if (options?.timestamps !== undefined) query.timestamps = options.timestamps ? 'true' : 'false';
     if (options?.until !== undefined)
       query.until = (
         Number.isInteger(options.until) ? options.until : Math.floor((options.until as Date).getTime() / 1000)
       ).toString();
-    return this.request('GET', '/containers/' + containerIdOrName + '/logs', { query, stream: options?.stream }).then(
+    return this.request('GET', '/containers/' + containerIdOrName + '/logs', { query, stream: false }).then(
       (response) => {
         if (!response.ok) {
-          const result: DockerResult<DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError> = {
+          const result: DockerResult<string, DockerGetContainerLogsResponseError> = {
             error: (response as DockerError).error,
           };
           if (response.status === 404) result.error!.notFound = true;
           return result;
         }
-        return (
-          options?.stream
-            ? {
-                success: {
-                  stream: new DockerLogStream(
-                    (response as DockerRequestResultBody).contentType,
-                    (response as DockerRequestResultBody).stream!,
-                  ),
-                },
-              }
-            : {
-                success: {
-                  text: (response as DockerRequestResultBody).body,
-                },
-              }
-        ) as DockerResult<DockerGetContainerLogsResponse, DockerGetContainerLogsResponseError>;
+        return {
+          success: (response as DockerRequestResultBody).body!,
+        };
+      },
+    );
+  }
+
+  /**
+   * Returns the logs of a container as a continuous stream.
+   * If the container was created with tty=true, the logs will only be a stream of type stdout.
+   *
+   * @param containerIdOrName ID or name of the container to return the logs from.
+   * @param options Optional options for querying logs.
+   * @returns Logs of the container as stream or an error.
+   */
+  public async getContainerLogsStream(
+    containerIdOrName: string,
+    options?: DockerGetContainerLogsOptions,
+  ): Promise<DockerResult<DockerLogStream, DockerGetContainerLogsResponseError>> {
+    const query: { [key: string]: string } = {};
+    query.follow = 'true';
+    if (options?.since !== undefined)
+      query.since = (
+        Number.isInteger(options.since) ? options.since : Math.floor((options.since as Date).getTime() / 1000)
+      ).toString();
+    if (options?.stdErr !== undefined) query.stderr = options.stdErr ? 'true' : 'false';
+    if (options?.stdOut !== undefined) query.stdout = options.stdOut ? 'true' : 'false';
+    if (options?.tail !== undefined) query.tail = options.tail.toString();
+    if (options?.timestamps !== undefined) query.timestamps = options.timestamps ? 'true' : 'false';
+    if (options?.until !== undefined)
+      query.until = (
+        Number.isInteger(options.until) ? options.until : Math.floor((options.until as Date).getTime() / 1000)
+      ).toString();
+    return this.request('GET', '/containers/' + containerIdOrName + '/logs', { query, stream: true }).then(
+      (response) => {
+        if (!response.ok) {
+          const result: DockerResult<DockerLogStream, DockerGetContainerLogsResponseError> = {
+            error: (response as DockerError).error,
+          };
+          if (response.status === 404) result.error!.notFound = true;
+          return result;
+        }
+        return {
+          success: new DockerLogStream(
+            (response as DockerRequestResultBody).contentType,
+            (response as DockerRequestResultBody).stream!,
+          ),
+        };
       },
     );
   }
@@ -581,44 +610,63 @@ class DockerClient {
   }
 
   /**
-   * Returns the utilization stats for a container as single value or as continuous stream.
+   * Returns the utilization stats for a container as single value.
    *
    * @param containerIdOrName ID or name of the container.
    * @param options Options for fetching the stats.
-   * @returns Single stats object, stream of stat objects, or an error.
+   * @returns Stats object or an error.
    */
   public async getContainerStats(
     containerIdOrName: string,
     options?: DockerGetContainerStatsOptions,
-  ): Promise<DockerResult<DockerGetContainerStatsResult, DockerGetContainerStatsResponseError>> {
+  ): Promise<DockerResult<DockerContainerStats, DockerGetContainerStatsResponseError>> {
     const query: { [key: string]: string } = {};
     if (options?.oneShot) query['one-shot'] = 'true';
-    query.stream = options?.stream ? 'true' : 'false'; // always set because default is true if not set.
+    query.stream = 'false';
 
-    return this.request('GET', '/containers/' + containerIdOrName + '/stats', { query, stream: options?.stream }).then(
+    return this.request('GET', '/containers/' + containerIdOrName + '/stats', { query, stream: false }).then(
       (response) => {
         if (!response.ok) {
-          const result: DockerResult<DockerGetContainerStatsResult, DockerGetContainerStatsResponseError> = {
+          const result: DockerResult<DockerContainerStats, DockerGetContainerStatsResponseError> = {
             error: (response as DockerError).error,
           };
           if (response.status === 404) result.error!.notFound = true;
           return result;
         }
 
-        // single response
-        if (!options?.stream) {
-          return {
-            success: {
-              single: decodeDockerContainerStats(JSON.parse((response as DockerRequestResultBody).body!))!,
-            },
+        // stats object
+        return {
+          success: decodeDockerContainerStats(JSON.parse((response as DockerRequestResultBody).body!))!,
+        };
+      },
+    );
+  }
+
+  /**
+   * Returns the utilization stats for a container as a continuous stream.
+   *
+   * @param containerIdOrName ID or name of the container.
+   * @returns Stream of stat objects or an error.
+   */
+  public async getContainerStatsStream(
+    containerIdOrName: string,
+  ): Promise<DockerResult<DockerStatsStream, DockerGetContainerStatsResponseError>> {
+    const query: { [key: string]: string } = {};
+    query.stream = 'true';
+
+    return this.request('GET', '/containers/' + containerIdOrName + '/stats', { query, stream: true }).then(
+      (response) => {
+        if (!response.ok) {
+          const result: DockerResult<DockerStatsStream, DockerGetContainerStatsResponseError> = {
+            error: (response as DockerError).error,
           };
+          if (response.status === 404) result.error!.notFound = true;
+          return result;
         }
 
         // stream
         return {
-          success: {
-            stream: new DockerStatsStream((response as DockerRequestResultBody).stream!),
-          },
+          success: new DockerStatsStream((response as DockerRequestResultBody).stream!),
         };
       },
     );
