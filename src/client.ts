@@ -389,7 +389,7 @@ class DockerClient {
     if (options?.force) query.force = 'true';
     if (options?.link) query.link = 'true';
     if (options?.volumes) query.v = 'true';
-    return this.requestJson('DELETE', '/containers/' + containerIdOrName, query).then<
+    return this.requestJson('DELETE', '/containers/' + containerIdOrName, { query }).then<
       DockerResult<{}, DockerDeleteContainerResponseError>
     >((response) => {
       if (!response.ok || response.body.message) {
@@ -599,7 +599,7 @@ class DockerClient {
       if (Object.keys(json).length > 0) query.filters = JSON.stringify(json);
     }
 
-    return this.requestJson('GET', '/containers/json', query).then<DockerResult<DockerContainer[]>>((response) => {
+    return this.requestJson('GET', '/containers/json', { query }).then<DockerResult<DockerContainer[]>>((response) => {
       if (!response.ok || response.body.message) {
         return { error: response.error! };
       }
@@ -716,7 +716,7 @@ class DockerClient {
     }
     if (options?.manifests) query.manifests = 'true';
     if (options?.sharedSize) query['shared-size'] = 'true';
-    return this.requestJson('GET', '/images/json', query).then<DockerResult<DockerImage[]>>((response) => {
+    return this.requestJson('GET', '/images/json', { query }).then<DockerResult<DockerImage[]>>((response) => {
       if (!response.ok) return { error: response.error! };
       return { success: (response.body as any[]).map<DockerImage>((image) => decodeDockerImage(image)!) };
     });
@@ -760,7 +760,7 @@ class DockerClient {
   ): Promise<DockerResult<{}, DockerKillContainerResponseError>> {
     const query: { [key: string]: string } = {};
     if (signal) query.signal = signal.toString();
-    return this.requestJson('POST', '/containers/' + containerIdOrName + '/kill', query).then<
+    return this.requestJson('POST', '/containers/' + containerIdOrName + '/kill', { query }).then<
       DockerResult<{}, DockerKillContainerResponseError>
     >((response) => {
       if (!response.ok || response.body.message) {
@@ -831,7 +831,7 @@ class DockerClient {
     const query: { [key: string]: string } = {};
     if (options?.signal) query.signal = options.signal.toString();
     if (options?.timeout !== undefined) query.t = options.timeout.toString();
-    return this.requestJson('POST', '/containers/' + containerIdOrName + '/restart', query).then<
+    return this.requestJson('POST', '/containers/' + containerIdOrName + '/restart', { query }).then<
       DockerResult<{}, DockerRestartContainerResponseError>
     >((response) => {
       if (!response.ok || response.body.message) {
@@ -861,7 +861,7 @@ class DockerClient {
   ): Promise<DockerResult<{}, DockerStartContainerResponseError>> {
     const query: { [key: string]: string } = {};
     if (detachKeys) query.detachKeys = detachKeys;
-    return this.requestJson('POST', '/containers/' + containerIdOrName + '/start', query).then<
+    return this.requestJson('POST', '/containers/' + containerIdOrName + '/start', { query }).then<
       DockerResult<{}, DockerStartContainerResponseError>
     >((response) => {
       if (!response.ok || response.body.message) {
@@ -893,7 +893,7 @@ class DockerClient {
     const query: { [key: string]: string } = {};
     if (options?.signal) query.signal = options.signal.toString();
     if (options?.timeout !== undefined) query.t = options.timeout.toString();
-    return this.requestJson('POST', '/containers/' + containerIdOrName + '/stop', query).then<
+    return this.requestJson('POST', '/containers/' + containerIdOrName + '/stop', { query }).then<
       DockerResult<{}, DockerStopContainerResponseError>
     >((response) => {
       if (!response.ok || response.body.message) {
